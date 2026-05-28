@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TNBC Gene Expression Lab Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0a;--surface:#111;--card:#161616;--border:#242424;
+  --accent:#3b82f6;--accent2:#8b5cf6;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;
+  --text:#e5e5e5;--muted:#525252;--subtle:#737373;
+}
+body{font-family:ui-monospace,'Cascadia Code','Courier New',monospace;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+header{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:52px;border-bottom:1px solid var(--border);background:var(--surface)}
+.logo{font-size:14px;font-weight:700;letter-spacing:.5px}
+.logo em{color:var(--accent);font-style:normal}
+.badge{font-size:10px;padding:3px 8px;border-radius:3px;background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.25);letter-spacing:1px}
+.badge.loading{background:rgba(245,158,11,.12);color:var(--amber);border-color:rgba(245,158,11,.25)}
+.badge.error{background:rgba(239,68,68,.12);color:var(--red);border-color:rgba(239,68,68,.25)}
+nav{display:flex;border-bottom:1px solid var(--border);background:var(--surface);padding:0 28px}
+.tab{padding:12px 20px;font-size:12px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;transition:color .15s,border-color .15s;letter-spacing:.5px}
+.tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.panel{display:none}.panel.active{display:block}
+.page{padding:24px 28px;max-width:1300px;margin:0 auto}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.full{grid-column:1/-1}
+.card{background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.card-head{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surface)}
+.card-title{font-size:10px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase}
+.card-body{padding:16px}
+.samples-wrap{display:flex;gap:12px;flex-wrap:wrap}
+.sample{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;padding:10px;border-radius:6px;border:2px solid transparent;background:var(--surface);transition:border-color .15s}
+.sample:hover{border-color:var(--border)}.sample.selected{border-color:var(--accent);background:rgba(59,130,246,.06)}
+.sample canvas{width:72px;height:72px;image-rendering:pixelated;border-radius:3px}
+.sample-lbl{font-size:10px;color:var(--accent);letter-spacing:.5px}
+.sample-sub{font-size:9px;color:var(--muted)}
+select,button{font-family:inherit;font-size:12px}
+select{width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:5px;outline:none;cursor:pointer}
+select:focus{border-color:var(--accent)}
+.run-btn{width:100%;background:var(--accent);border:none;color:#fff;padding:11px;border-radius:5px;font-weight:700;cursor:pointer;transition:opacity .15s;letter-spacing:.5px;margin-top:10px}
+.run-btn:hover{opacity:.85}.run-btn:disabled{opacity:.5;cursor:not-allowed}
+.pred-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.pred-class{font-size:20px;font-weight:700;text-transform:uppercase}
+.pred-conf{font-size:11px;color:var(--amber)}
+.prob-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.prob-name{width:72px;text-align:right;font-size:10px;color:var(--subtle);flex-shrink:0}
+.prob-bg{flex:1;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.prob-fill{height:100%;border-radius:3px;background:var(--accent2);transition:width .5s ease}
+.prob-fill.top{background:var(--accent)}
+.prob-val{width:36px;font-size:10px;color:var(--muted)}
+.placeholder{display:flex;align-items:center;justify-content:center;height:180px;color:var(--muted);font-size:11px}
+.chart-svg{width:100%;overflow:visible}
+.axis-label{font-family:ui-monospace,monospace;font-size:9px;fill:#525252}
+.axis-line{stroke:#242424;stroke-width:1}
+.grid-line{stroke:#1a1a1a;stroke-width:1}
+.chart-line{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.chart-dot{r:3}
+.chart-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--subtle)}
+.leg-dot{width:10px;height:3px;border-radius:2px}
+.comp-page{padding:24px 28px;max-width:1300px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-size:9px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);padding:10px 14px;border-bottom:1px solid var(--border);text-align:left}
+td{padding:10px 14px;border-bottom:1px solid rgba(36,36,36,.6)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.02)}
+.type-pill{display:inline-block;padding:2px 7px;border-radius:3px;font-size:9px;letter-spacing:.5px;font-weight:700}
+.pill-mlp{background:rgba(139,92,246,.15);color:#a78bfa}
+.pill-cnn{background:rgba(59,130,246,.15);color:#60a5fa}
+.pill-transfer{background:rgba(245,158,11,.15);color:#fbbf24}
+.acc-cell{display:flex;align-items:center;gap:8px}
+.acc-bg{width:80px;height:5px;background:var(--border);border-radius:3px;overflow:hidden}
+.acc-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.best{color:var(--green);font-size:9px;margin-left:4px}
+.tab-sub{display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--border)}
+.sub-tab{padding:8px 16px;font-size:11px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.sub-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.sub-tab:hover{color:var(--text)}
+.sub-panel{display:none}.sub-panel.active{display:block}
+.spinner{display:inline-block;width:12px;height:12px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;vertical-align:middle}
+@keyframes spin{to{transform:rotate(360deg)}}
+.api-status{font-size:10px;padding:2px 8px;border-radius:3px;margin-left:8px}
+.upload-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;padding:10px;border-radius:6px;border:2px dashed var(--border);background:var(--surface);transition:border-color .15s;width:92px;min-height:110px;text-align:center}
+.upload-tile:hover{border-color:var(--accent)}
+.upload-tile.selected{border-color:var(--accent);background:rgba(59,130,246,.06);border-style:solid}
+.upload-tile canvas{width:72px;height:72px;image-rendering:pixelated;border-radius:3px}
+.upload-tile .sample-lbl{font-size:10px;color:var(--accent);letter-spacing:.5px}
+.upload-tile .sample-sub{font-size:9px;color:var(--muted)}
+.upload-icon{font-size:22px;color:var(--muted)}
+.upload-hint{font-size:9px;color:var(--muted);line-height:1.4}
+#fileInput{display:none}
+@media(max-width:900px){.grid2,.grid3{grid-template-columns:1fr}.full{grid-column:1}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">TNBC<em>-GSE76275</em> · Lab 6 Web</div>
+  <div class="badge loading" id="statusBadge">⟳ LOADING TNBC DATA…</div>
+</header>
+
+<nav>
+  <div class="tab active" onclick="switchTab('dash',this)">Dashboard</div>
+  <div class="tab" onclick="switchTab('comp',this)">Model Comparison</div>
+</nav>
+
+<!-- ═══ DASHBOARD ═══ -->
+<div class="panel active" id="panel-dash">
+<div class="page">
+  <div class="grid2">
+
+    <div class="card full">
+      <div class="card-head">
+        <span class="card-title">TNBC Subtypes — click to select</span>
+        <span id="selInfo" style="font-size:10px;color:var(--muted)">loading samples…</span>
+      </div>
+      <div class="card-body"><div class="samples-wrap" id="samplesWrap">
+        <div class="placeholder"><span class="spinner"></span> fetching samples from API…</div>
+      </div>
+      <!-- hidden file input for image upload -->
+      <input type="file" id="fileInput" accept="image/*" onchange="handleFileUpload(event)">
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span class="card-title">Model</span></div>
+      <div class="card-body">
+        <select id="modelSel" onchange="onModelChange()">
+          <option value="MLP_relu">MLP — ReLU</option>
+          <option value="MLP_tanh">MLP — Tanh</option>
+          <option value="MLP_sigmoid">MLP — Sigmoid</option>
+          <option value="MLP_elu">MLP — ELU</option>
+          <option value="Simple_DNN">Simple DNN (2 hidden layers)</option>
+          <option value="Deep_DNN">Deep DNN (4 hidden layers)</option>
+          <option value="SVC" selected>SVC — RBF Kernel ★ best</option>
+          <option value="RandomForestClassifier">Random Forest Classifier</option>
+          <option value="XGBClassifier">XGBoost Classifier</option>
+          <option value="AE_Transfer">Autoencoder Transfer</option>
+          <option value="PCA_Transfer">PCA Transfer</option>
+          <option value="SparseAE_Transfer">Sparse AE Transfer</option>
+        </select>
+        <button class="run-btn" id="runBtn" onclick="runPredict()" disabled>Run Prediction →</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Prediction Output</span>
+        <span id="outModel" style="font-size:10px;color:var(--accent)"></span>
+      </div>
+      <div class="card-body">
+        <div id="outWrap"><div class="placeholder">Select an image and run a model</div></div>
+      </div>
+    </div>
+
+    <div class="card full" id="modelChartsCard">
+      <div class="card-head">
+        <span class="card-title" id="modelChartsTitle">Training Curves — SVC</span>
+        <span id="modelTestAcc" style="font-size:10px;color:var(--green)"></span>
+      </div>
+      <div class="card-body">
+        <div class="grid2" style="gap:24px">
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">ACCURACY</div>
+            <svg id="dashAccChart" class="chart-svg" height="160"></svg>
+            <div class="chart-legend">
+              <div class="leg-item"><div class="leg-dot" style="background:#3b82f6"></div>Train Acc</div>
+              <div class="leg-item"><div class="leg-dot" style="background:#22c55e"></div>Val Acc</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--muted);margin-bottom:8px;letter-spacing:1px">LOSS</div>
+            <svg id="dashLossChart" class="chart-svg" height="160"></svg>
+            <div class="chart-legend">
+              <div class="leg-item"><div class="leg-dot" style="background:#ef4444"></div>Train Loss</div>
+              <div class="leg-item"><div class="leg-dot" style="background:#f59e0b"></div>Val Loss</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ═══ COMPARISON ═══ -->
+<div class="panel" id="panel-comp">
+<div class="comp-page">
+
+  <div class="tab-sub">
+    <div class="sub-tab active" onclick="switchSub('overview',this)">Overview</div>
+    <div class="sub-tab" onclick="switchSub('curves',this)">Training Curves</div>
+    <div class="sub-tab" onclick="switchSub('scatter',this)">Time vs Accuracy</div>
+    <div class="sub-tab" onclick="switchSub('params',this)">Params vs Accuracy</div>
+    <div class="sub-tab" onclick="switchSub('table',this)">Full Table</div>
+  </div>
+
+  <div class="sub-panel active" id="sub-overview">
+    <div class="grid2" style="gap:16px">
+      <div class="card full">
+        <div class="card-head"><span class="card-title">Test Accuracy — All Models</span></div>
+        <div class="card-body"><svg id="overviewBar" class="chart-svg" height="260"></svg></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">By Model Type — Avg Accuracy</span></div>
+        <div class="card-body"><svg id="typeBar" class="chart-svg" height="160"></svg></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Summary Stats</span></div>
+        <div class="card-body" id="summaryStats"><div class="placeholder"><span class="spinner"></span> loading…</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-panel" id="sub-curves">
+    <div class="grid2" style="gap:16px">
+      <div class="card">
+        <div class="card-head"><span class="card-title">MLP Models — Accuracy</span></div>
+        <div class="card-body"><svg id="mlpAccChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="mlpAccLeg"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">MLP Models — Loss</span></div>
+        <div class="card-body"><svg id="mlpLossChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="mlpLossLeg"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">CNN Models — Accuracy</span></div>
+        <div class="card-body"><svg id="cnnAccChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="cnnAccLeg"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">CNN Models — Loss</span></div>
+        <div class="card-body"><svg id="cnnLossChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="cnnLossLeg"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Transfer Learning — Accuracy</span></div>
+        <div class="card-body"><svg id="tlAccChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="tlAccLeg"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span class="card-title">Transfer Learning — Loss</span></div>
+        <div class="card-body"><svg id="tlLossChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="tlLossLeg"></div></div>
+      </div>
+      <div class="card full">
+        <div class="card-head"><span class="card-title">All Models — Validation Accuracy</span></div>
+        <div class="card-body"><svg id="allValAccChart" class="chart-svg" height="180"></svg><div class="chart-legend" id="allValAccLeg"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sub-panel" id="sub-scatter">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Training Time (s) vs Test Accuracy</span></div>
+      <div class="card-body"><svg id="scatterTime" class="chart-svg" height="320"></svg><div class="chart-legend" id="scatterTimeLeg"></div></div>
+    </div>
+  </div>
+
+  <div class="sub-panel" id="sub-params">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Number of Parameters vs Test Accuracy</span></div>
+      <div class="card-body"><svg id="scatterParams" class="chart-svg" height="320"></svg><div class="chart-legend" id="scatterParamsLeg"></div></div>
+    </div>
+  </div>
+
+  <div class="sub-panel" id="sub-table">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Full Results Table</span></div>
+      <div class="card-body" style="padding:0;overflow-x:auto">
+        <table><thead><tr>
+          <th>#</th><th>Model</th><th>Type</th><th>Test Acc</th><th>Val Acc (final)</th><th>Parameters</th><th>Train Time</th>
+        </tr></thead>
+        <tbody id="tBody"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px"><span class="spinner"></span> loading…</td></tr></tbody></table>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ═══ STATE ══════════════════════════════════════════════════════════════════
+const API = '';  // same-origin; set to 'http://localhost:5000' for separate dev server
+let HISTORY = {}, MODELS = [], SAMPLES = [];
+let selectedIdx = null;
+let dataReady = false;
+
+const TYPE_COLOR = {
+  'MLP':'#8b5cf6',
+  'Custom DNN':'#3b82f6',
+  'Traditional ML':'#06b6d4',
+  'Transfer Learning':'#f59e0b'
+};
+const MODEL_COLORS = ['#3b82f6','#22c55e','#f59e0b','#8b5cf6','#ef4444','#06b6d4','#f97316','#a3e635','#e879f9','#ec4899','#14b8a6','#f43f5e'];
+
+// ═══ CLASS PALETTES for canvas thumbnails ════════════════════════════════════
+// 3 classes: IM (immunomodulatory), LAR (luminal AR), MES (mesenchymal)
+const CLASS_PALETTES = [
+  [[80,140,80],[120,180,100],[50,100,60]],      // IM  — green
+  [[180,140,100],[210,170,130],[130,100,70]],   // LAR — tan
+  [[100,160,80],[140,200,100],[80,130,60]]      // MES — olive
+];
+const CLASSES = ['IM','LAR','MES'];
+
+function seededRand(seed) {
+  let s = seed & 0xFFFFFFFF;
+  return () => { s = (s*1664525+1013904223) & 0xFFFFFFFF; return (s>>>0)/0xFFFFFFFF; };
+}
+function genImage(label, seed) {
+  const r = seededRand(seed);
+  const pal = CLASS_PALETTES[label];
+  const px = new Uint8ClampedArray(32*32*3);
+  for (let i = 0; i < 32*32; i++) {
+    const c = pal[Math.floor(r()*pal.length)];
+    px[i*3]   = Math.min(255, c[0]+Math.floor((r()-.5)*40));
+    px[i*3+1] = Math.min(255, c[1]+Math.floor((r()-.5)*40));
+    px[i*3+2] = Math.min(255, c[2]+Math.floor((r()-.5)*40));
+  }
+  return px;
+}
+
+// ═══ BOOT — fetch everything from the real API ═══════════════════════════════
+async function boot() {
+  try {
+    setBadge('loading','⟳ CONNECTING…');
+    const [samplesRes, modelsRes, historyRes] = await Promise.all([
+      fetch(API+'/api/samples'),
+      fetch(API+'/api/models'),
+      fetch(API+'/api/history'),
+    ]);
+    SAMPLES = await samplesRes.json();
+    MODELS  = await modelsRes.json();
+    HISTORY = await historyRes.json();
+
+    dataReady = true;
+    setBadge('ok','● LIVE — REAL DATA');
+    document.getElementById('selInfo').textContent = 'none selected';
+    document.getElementById('runBtn').disabled = false;
+
+    renderSamples();
+    onModelChange();
+  } catch(e) {
+    setBadge('error','✕ API OFFLINE');
+    document.getElementById('selInfo').textContent = 'backend not reachable';
+    document.getElementById('samplesWrap').innerHTML =
+      '<div class="placeholder" style="color:var(--red)">⚠ Cannot reach Flask backend at '+API+'/api/samples<br>Start the server: python app.py</div>';
+  }
+}
+
+function setBadge(state, text) {
+  const b = document.getElementById('statusBadge');
+  b.textContent = text;
+  b.className = 'badge' + (state==='loading'?' loading': state==='error'?' error':'');
+}
+
+// ═══ TAB NAVIGATION ══════════════════════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-'+name).classList.add('active');
+  if (name==='comp' && dataReady) setTimeout(renderAllCompCharts, 50);
+}
+function switchSub(name, el) {
+  document.querySelectorAll('.sub-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.sub-panel').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('sub-'+name).classList.add('active');
+  if (dataReady) setTimeout(renderAllCompCharts, 50);
+}
+
+// ═══ SAMPLES PANEL ═══════════════════════════════════════════════════════════
+let uploadedImageB64 = null;
+let uploadedCanvas = null;
+
+function renderSamples() {
+  const wrap = document.getElementById('samplesWrap');
+  wrap.innerHTML = '';
+
+  // Existing dataset samples
+  SAMPLES.forEach((s,i) => {
+    const div = document.createElement('div');
+    div.className = 'sample'+(selectedIdx===i?' selected':'');
+    div.onclick = () => {
+      selectedIdx = i;
+      uploadedImageB64 = null; // clear any upload
+      renderSamples();
+      document.getElementById('selInfo').textContent = '#'+s.idx+' · true: '+CLASSES[s.label];
+    };
+    const canvas = document.createElement('canvas');
+    canvas.width = 32; canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+    const px = genImage(s.label, s.idx);
+    const img = ctx.createImageData(32,32);
+    for (let p = 0; p < 32*32; p++) {
+      img.data[p*4]=px[p*3]; img.data[p*4+1]=px[p*3+1]; img.data[p*4+2]=px[p*3+2]; img.data[p*4+3]=255;
+    }
+    ctx.putImageData(img,0,0);
+    const lbl = document.createElement('div'); lbl.className='sample-lbl'; lbl.textContent=CLASSES[s.label];
+    const sub = document.createElement('div'); sub.className='sample-sub'; sub.textContent='#'+s.idx;
+    div.appendChild(canvas); div.appendChild(lbl); div.appendChild(sub);
+    wrap.appendChild(div);
+  });
+
+  // Upload tile
+  const isUploadSelected = selectedIdx === 'upload';
+  const uploadDiv = document.createElement('div');
+  uploadDiv.className = 'upload-tile' + (isUploadSelected ? ' selected' : '');
+  uploadDiv.title = 'Upload a CIFAR-10 image (32×32 or any size — will be resized)';
+  uploadDiv.onclick = () => document.getElementById('fileInput').click();
+
+  if (uploadedCanvas && isUploadSelected) {
+    // Show the uploaded image
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = 32; previewCanvas.height = 32;
+    previewCanvas.getContext('2d').drawImage(uploadedCanvas, 0, 0, 32, 32);
+    const lbl = document.createElement('div'); lbl.className='sample-lbl'; lbl.textContent='uploaded';
+    const sub = document.createElement('div'); sub.className='sample-sub'; sub.textContent='click to change';
+    uploadDiv.appendChild(previewCanvas); uploadDiv.appendChild(lbl); uploadDiv.appendChild(sub);
+  } else if (uploadedCanvas) {
+    // Upload tile with preview (not selected)
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width = 32; previewCanvas.height = 32;
+    previewCanvas.getContext('2d').drawImage(uploadedCanvas, 0, 0, 32, 32);
+    const lbl = document.createElement('div'); lbl.className='sample-lbl'; lbl.textContent='uploaded';
+    const sub = document.createElement('div'); sub.className='sample-sub'; sub.textContent='click to select';
+    uploadDiv.appendChild(previewCanvas); uploadDiv.appendChild(lbl); uploadDiv.appendChild(sub);
+    uploadDiv.onclick = () => {
+      selectedIdx = 'upload';
+      renderSamples();
+      document.getElementById('selInfo').textContent = 'uploaded image · unknown true label';
+    };
+  } else {
+    // Empty upload prompt
+    const icon = document.createElement('div'); icon.className='upload-icon'; icon.textContent='↑';
+    const hint = document.createElement('div'); hint.className='upload-hint'; hint.textContent='Upload image';
+    uploadDiv.appendChild(icon); uploadDiv.appendChild(hint);
+  }
+
+  wrap.appendChild(uploadDiv);
+}
+
+// ═══ FILE UPLOAD HANDLER ═════════════════════════════════════════════════════
+function handleFileUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    // Strip the data URL prefix to get raw base64
+    uploadedImageB64 = dataUrl.split(',')[1];
+
+    // Draw into an offscreen canvas for preview (resized to 32x32)
+    const img = new Image();
+    img.onload = () => {
+      uploadedCanvas = document.createElement('canvas');
+      uploadedCanvas.width = 32; uploadedCanvas.height = 32;
+      uploadedCanvas.getContext('2d').drawImage(img, 0, 0, 32, 32);
+
+      // Auto-select the upload tile
+      selectedIdx = 'upload';
+      renderSamples();
+      document.getElementById('selInfo').textContent = 'uploaded: '+file.name+' · unknown true label';
+    };
+    img.src = dataUrl;
+  };
+  reader.readAsDataURL(file);
+  // Reset so same file can be re-uploaded
+  event.target.value = '';
+}
+
+// ═══ MODEL CHANGE — update training curves from live API data ════════════════
+function onModelChange() {
+  if (!dataReady) return;
+  const model = document.getElementById('modelSel').value;
+  document.getElementById('modelChartsTitle').textContent = 'Training Curves — '+model;
+  const testAcc = HISTORY[model] ? (HISTORY[model].test_acc*100).toFixed(2)+'% test acc' : '';
+  document.getElementById('modelTestAcc').textContent = testAcc;
+  const h = HISTORY[model];
+  if (!h) return;
+  makeSVGChart('dashAccChart',[
+    {data:h.train_acc, color:'#3b82f6', label:'Train Acc'},
+    {data:h.val_acc,   color:'#22c55e', label:'Val Acc', dashed:true}
+  ], {minV:0, maxV:1});
+  makeSVGChart('dashLossChart',[
+    {data:h.train_loss, color:'#ef4444', label:'Train Loss'},
+    {data:h.val_loss,   color:'#f59e0b', label:'Val Loss', dashed:true}
+  ]);
+}
+
+// ═══ PREDICTION — real POST to /api/predict ═══════════════════════════════
+async function runPredict() {
+  if (selectedIdx === null) { alert('Select an image first'); return; }
+  if (!dataReady) return;
+
+  const model = document.getElementById('modelSel').value;
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Running…';
+
+  try {
+    let data;
+
+    if (selectedIdx === 'upload') {
+      // ── Uploaded image path ──────────────────────────────────────────────
+      if (!uploadedImageB64) { alert('No image uploaded yet.'); btn.disabled=false; btn.textContent='Run Prediction →'; return; }
+      const res = await fetch(API+'/api/classify_upload', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ image_b64: uploadedImageB64, model })
+      });
+      data = await res.json();
+    } else {
+      // ── Dataset sample path ──────────────────────────────────────────────
+      const s = SAMPLES[selectedIdx];
+      const res = await fetch(API+'/api/predict', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({sample_idx: s.idx, sample_label: s.label, model})
+      });
+      data = await res.json();
+    }
+
+    // Surface backend errors clearly instead of crashing
+    if (data.error) {
+      document.getElementById('outModel').textContent = model;
+      document.getElementById('outWrap').innerHTML =
+        `<div class="placeholder" style="color:var(--red);flex-direction:column;gap:8px;text-align:center">
+          <div>⚠ Backend error</div>
+          <div style="font-size:10px;color:var(--subtle);max-width:340px">${data.error}</div>
+        </div>`;
+      return;
+    }
+
+    const testAccStr = data.model_test_acc != null ? data.model_test_acc+'%' : '—';
+    document.getElementById('outModel').textContent = model+' · test acc '+testAccStr;
+    const correct = data.correct;
+    const isUpload = selectedIdx === 'upload';
+    let html = `<div class="pred-top">
+      <div class="pred-class" style="color:${isUpload?'var(--accent)':correct?'var(--accent)':'var(--red)'}">${data.predicted_label}</div>
+      <div class="pred-conf">${data.confidence}% confidence${isUpload?' · uploaded image':correct?' · ✓ correct':' · ✗ wrong (true: '+data.true_label+')'}</div>
+    </div>`;
+    if (isUpload && data.claude_label) {
+      html += `<div style="font-size:9px;color:var(--muted);margin-bottom:10px;padding:6px 8px;background:rgba(59,130,246,.08);border-radius:4px;border-left:2px solid var(--accent)">
+        👁 Claude vision identified this image as <strong style="color:var(--accent)">${data.claude_label}</strong> · probabilities reflect ${model} per-class accuracy
+      </div>`;
+    } else if (isUpload && data.note) {
+      html += `<div style="font-size:9px;color:var(--muted);margin-bottom:10px;padding:6px 8px;background:rgba(245,158,11,.08);border-radius:4px;border-left:2px solid var(--amber)">ⓘ ${data.note}</div>`;
+    }
+    data.probs.forEach(p => {
+      const isTop = p.class === data.predicted_label;
+      html += `<div class="prob-row">
+        <div class="prob-name">${p.class}</div>
+        <div class="prob-bg"><div class="prob-fill ${isTop?'top':''}" style="width:${p.prob.toFixed(1)}%"></div></div>
+        <div class="prob-val">${p.prob.toFixed(1)}%</div>
+      </div>`;
+    });
+    document.getElementById('outWrap').innerHTML = html;
+  } catch(e) {
+    document.getElementById('outWrap').innerHTML =
+      `<div class="placeholder" style="color:var(--red);flex-direction:column;gap:8px;text-align:center">
+        <div>⚠ Prediction failed — is the backend running?</div>
+        <div style="font-size:10px;color:var(--subtle)">${e.message||''}</div>
+      </div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Run Prediction →';
+  }
+}
+
+// ═══ SVG CHART HELPERS (unchanged from original) ═════════════════════════════
+function makeSVGChart(svgId, series, opts={}) {
+  const el = document.getElementById(svgId);
+  if (!el) return;
+  const W = el.parentElement.clientWidth || 520;
+  const H = parseInt(el.getAttribute('height')) || 160;
+  const pad = {l:36,r:12,t:10,b:28};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  el.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  el.innerHTML = '';
+  const allVals = series.flatMap(s=>s.data);
+  const minV = opts.minV !== undefined ? opts.minV : Math.min(...allVals)*0.95;
+  const maxV = opts.maxV !== undefined ? opts.maxV : Math.max(...allVals)*1.05;
+  const maxLen = Math.max(...series.map(s=>s.data.length));
+  const sx = i => pad.l + (i/(maxLen-1||1))*cW;
+  const sy = v => pad.t + cH - ((v-minV)/(maxV-minV||1))*cH;
+
+  [0,.25,.5,.75,1].forEach(f => {
+    const y = pad.t + cH*(1-f);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',pad.l); line.setAttribute('x2',pad.l+cW);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line'); el.appendChild(line);
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pad.l-4); t.setAttribute('y',y+3);
+    t.setAttribute('text-anchor','end'); t.setAttribute('class','axis-label');
+    t.textContent = (minV+f*(maxV-minV)).toFixed(2); el.appendChild(t);
+  });
+  const ax = document.createElementNS('http://www.w3.org/2000/svg','line');
+  ax.setAttribute('x1',pad.l); ax.setAttribute('x2',pad.l+cW);
+  ax.setAttribute('y1',pad.t+cH); ax.setAttribute('y2',pad.t+cH);
+  ax.setAttribute('class','axis-line'); el.appendChild(ax);
+  for (let i=0; i<maxLen; i++) {
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',sx(i)); t.setAttribute('y',H-4);
+    t.setAttribute('text-anchor','middle'); t.setAttribute('class','axis-label');
+    t.textContent = i+1; el.appendChild(t);
+  }
+  series.forEach(s => {
+    const pts = s.data.map((v,i)=>`${sx(i).toFixed(1)},${sy(v).toFixed(1)}`).join(' ');
+    const poly = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+    poly.setAttribute('points',pts); poly.setAttribute('class','chart-line');
+    poly.setAttribute('stroke',s.color);
+    if (s.dashed) poly.setAttribute('stroke-dasharray','4 3');
+    el.appendChild(poly);
+    s.data.forEach((v,i) => {
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',sx(i)); c.setAttribute('cy',sy(v));
+      c.setAttribute('r',3); c.setAttribute('fill',s.color);
+      const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+      title.textContent = `Epoch ${i+1}: ${v.toFixed(4)}`; c.appendChild(title);
+      el.appendChild(c);
+    });
+  });
+}
+
+function makeBarChart(svgId, labels, values, colors) {
+  const el = document.getElementById(svgId);
+  if (!el) return;
+  const W = el.parentElement.clientWidth || 600;
+  const H = parseInt(el.getAttribute('height')) || 200;
+  const pad = {l:120,r:60,t:16,b:20};
+  const cW = W-pad.l-pad.r, cH = H-pad.t-pad.b;
+  el.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  el.innerHTML = '';
+  const maxV = Math.max(...values)*1.1;
+  const gap = cH/labels.length, barH = gap*0.55;
+
+  [0,.25,.5,.75,1].forEach(f => {
+    const x = pad.l+f*cW;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',x); line.setAttribute('x2',x);
+    line.setAttribute('y1',pad.t); line.setAttribute('y2',pad.t+cH);
+    line.setAttribute('class','grid-line'); el.appendChild(line);
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',x); t.setAttribute('y',pad.t+cH+12);
+    t.setAttribute('text-anchor','middle'); t.setAttribute('class','axis-label');
+    t.textContent = (f*maxV).toFixed(2); el.appendChild(t);
+  });
+  labels.forEach((lbl,i) => {
+    const y = pad.t+i*gap+(gap-barH)/2;
+    const bW = (values[i]/maxV)*cW;
+    const t = document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pad.l-6); t.setAttribute('y',y+barH/2+3);
+    t.setAttribute('text-anchor','end'); t.setAttribute('class','axis-label');
+    t.setAttribute('font-size','9');
+    t.textContent = lbl.replace('_Transfer','').replace('_',' '); el.appendChild(t);
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x',pad.l); rect.setAttribute('y',y);
+    rect.setAttribute('width',bW); rect.setAttribute('height',barH);
+    rect.setAttribute('fill',colors[i]); rect.setAttribute('opacity','0.85'); rect.setAttribute('rx','2');
+    const title = document.createElementNS('http://www.w3.org/2000/svg','title');
+    title.textContent = `${lbl}: ${(values[i]*100).toFixed(2)}%`; rect.appendChild(title);
+    el.appendChild(rect);
+    const vt = document.createElementNS('http://www.w3.org/2000/svg','text');
+    vt.setAttribute('x',pad.l+bW+4); vt.setAttribute('y',y+barH/2+3);
+    vt.setAttribute('class','axis-label'); vt.setAttribute('font-size','9'); vt.setAttribute('fill','#737373');
+    vt.textContent = (values[i]*100).toFixed(1)+'%'; el.appendChild(vt);
+  });
+}
+
+function makeScatter(svgId, points, legId) {
+  const el = document.getElementById(svgId);
+  if (!el) return;
+  const W = el.parentElement.clientWidth || 700;
+  const H = parseInt(el.getAttribute('height')) || 300;
+  const pad = {l:48,r:20,t:16,b:40};
+  const cW=W-pad.l-pad.r, cH=H-pad.t-pad.b;
+  el.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  el.innerHTML='';
+  const xs=points.map(p=>p.x), ys=points.map(p=>p.y);
+  const minX=Math.min(...xs), maxX=Math.max(...xs);
+  const minY=Math.min(...ys)*0.95, maxY=Math.max(...ys)*1.05;
+  const sx=x=>pad.l+(x-minX)/(maxX-minX||1)*cW;
+  const sy=y=>pad.t+cH-(y-minY)/(maxY-minY||1)*cH;
+  [0,.25,.5,.75,1].forEach(f=>{
+    const y=pad.t+cH*(1-f);
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',pad.l);line.setAttribute('x2',pad.l+cW);
+    line.setAttribute('y1',y);line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line');el.appendChild(line);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pad.l-4);t.setAttribute('y',y+3);
+    t.setAttribute('text-anchor','end');t.setAttribute('class','axis-label');
+    t.textContent=(minY+f*(maxY-minY)).toFixed(2);el.appendChild(t);
+  });
+  const ax=document.createElementNS('http://www.w3.org/2000/svg','line');
+  ax.setAttribute('x1',pad.l);ax.setAttribute('x2',pad.l+cW);
+  ax.setAttribute('y1',pad.t+cH);ax.setAttribute('y2',pad.t+cH);
+  ax.setAttribute('class','axis-line');el.appendChild(ax);
+  [0,.25,.5,.75,1].forEach(f=>{
+    const v=minX+f*(maxX-minX);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',pad.l+f*cW);t.setAttribute('y',H-6);
+    t.setAttribute('text-anchor','middle');t.setAttribute('class','axis-label');
+    t.textContent=v>1000?(v/1000).toFixed(0)+'k':v.toFixed(0);el.appendChild(t);
+  });
+  points.forEach(p=>{
+    const cx=sx(p.x),cy=sy(p.y);
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',cx);circle.setAttribute('cy',cy);
+    circle.setAttribute('r',7);circle.setAttribute('fill',p.color);circle.setAttribute('opacity','0.8');
+    const title=document.createElementNS('http://www.w3.org/2000/svg','title');
+    title.textContent=`${p.label}\nX: ${p.x.toLocaleString()}\nAcc: ${(p.y*100).toFixed(2)}%`;
+    circle.appendChild(title);el.appendChild(circle);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',cx+9);t.setAttribute('y',cy-5);
+    t.setAttribute('class','axis-label');t.setAttribute('font-size','8');t.setAttribute('fill','#737373');
+    t.textContent=p.label.replace('_Transfer','').replace('_',' ');el.appendChild(t);
+  });
+  if(legId){
+    const legEl=document.getElementById(legId);
+    if(legEl){
+      const types=[...new Set(points.map(p=>p.type))];
+      legEl.innerHTML=types.map(t=>`<div class="leg-item"><div class="leg-dot" style="background:${TYPE_COLOR[t]};height:8px;width:8px;border-radius:50%"></div>${t}</div>`).join('');
+    }
+  }
+}
+
+// ═══ COMPARISON CHARTS — driven by live API data ════════════════════════════
+function renderAllCompCharts() {
+  if (!dataReady) return;
+
+  // Overview bar
+  const sorted=[...MODELS].sort((a,b)=>b.acc-a.acc);
+  makeBarChart('overviewBar', sorted.map(m=>m.name), sorted.map(m=>m.acc),
+    sorted.map(m=>TYPE_COLOR[m.type]));
+
+  // Type avg bar
+  const types=['MLP','Custom DNN','Traditional ML','Transfer Learning'];
+  const typeAvgs=types.map(t=>{const ms=MODELS.filter(m=>m.type===t);return ms.reduce((s,m)=>s+m.acc,0)/ms.length});
+  makeBarChart('typeBar', types, typeAvgs, types.map(t=>TYPE_COLOR[t]));
+
+  // Summary stats
+  const maxM=MODELS.reduce((a,b)=>a.acc>b.acc?a:b);
+  const minM=MODELS.reduce((a,b)=>a.acc<b.acc?a:b);
+  const avgAcc=MODELS.reduce((s,m)=>s+m.acc,0)/MODELS.length;
+  const fastest=MODELS.reduce((a,b)=>a.time<b.time?a:b);
+  const mostP=MODELS.reduce((a,b)=>a.params>b.params?a:b);
+  const leastP=MODELS.reduce((a,b)=>a.params<b.params?a:b);
+  document.getElementById('summaryStats').innerHTML=`
+    <div style="display:grid;gap:10px">
+      ${[
+        ['Best Model', maxM.name.replace('_',' ')+' — '+(maxM.acc*100).toFixed(2)+'%','var(--green)'],
+        ['Worst Model', minM.name.replace('_Transfer','').replace('_',' ')+' — '+(minM.acc*100).toFixed(2)+'%','var(--red)'],
+        ['Mean Accuracy', (avgAcc*100).toFixed(2)+'%','var(--accent)'],
+        ['Fastest Train', fastest.name.replace('_',' ')+' — '+fastest.time.toFixed(0)+'s','var(--amber)'],
+        ['Most Params', mostP.name.replace('_Transfer','').replace('_',' ')+' — '+(mostP.params/1e6).toFixed(1)+'M','var(--subtle)'],
+        ['Fewest Params', leastP.name.replace('_',' ')+' — '+(leastP.params/1e3).toFixed(0)+'k','var(--subtle)'],
+      ].map(([k,v,c])=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="font-size:10px;color:var(--muted)">${k}</span>
+        <span style="font-size:11px;color:${c};font-weight:600">${v}</span>
+      </div>`).join('')}
+    </div>`;
+
+  // MLP curves
+  const mlpModels=['MLP_relu','MLP_tanh','MLP_sigmoid','MLP_elu'];
+  const mlpColors=['#3b82f6','#22c55e','#f59e0b','#8b5cf6'];
+  makeSVGChart('mlpAccChart',mlpModels.map((m,i)=>({data:HISTORY[m].train_acc,color:mlpColors[i],label:m})),{minV:0,maxV:1});
+  makeSVGChart('mlpLossChart',mlpModels.map((m,i)=>({data:HISTORY[m].train_loss,color:mlpColors[i],label:m})));
+  document.getElementById('mlpAccLeg').innerHTML=mlpModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${mlpColors[i]}"></div>${m}</div>`).join('');
+  document.getElementById('mlpLossLeg').innerHTML=mlpModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${mlpColors[i]}"></div>${m}</div>`).join('');
+
+  // DNN curves
+  const dnnModels=['Simple_DNN','Deep_DNN'];
+  const dnnColors=['#3b82f6','#f97316'];
+  makeSVGChart('cnnAccChart',dnnModels.map((m,i)=>({data:HISTORY[m].train_acc,color:dnnColors[i]})),{minV:0,maxV:1});
+  makeSVGChart('cnnLossChart',dnnModels.map((m,i)=>({data:HISTORY[m].train_loss,color:dnnColors[i]})));
+  document.getElementById('cnnAccLeg').innerHTML=dnnModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${dnnColors[i]}"></div>${m}</div>`).join('');
+  document.getElementById('cnnLossLeg').innerHTML=dnnModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${dnnColors[i]}"></div>${m}</div>`).join('');
+
+  // Transfer curves
+  const tlModels=['AE_Transfer','PCA_Transfer','SparseAE_Transfer'];
+  const tlColors=['#22c55e','#ef4444','#f59e0b'];
+  makeSVGChart('tlAccChart',tlModels.map((m,i)=>({data:HISTORY[m].train_acc,color:tlColors[i]})),{minV:0,maxV:1});
+  makeSVGChart('tlLossChart',tlModels.map((m,i)=>({data:HISTORY[m].train_loss,color:tlColors[i]})));
+  document.getElementById('tlAccLeg').innerHTML=tlModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${tlColors[i]}"></div>${m.replace('_Transfer','')}</div>`).join('');
+  document.getElementById('tlLossLeg').innerHTML=tlModels.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${tlColors[i]}"></div>${m.replace('_Transfer','')}</div>`).join('');
+
+  // All val acc
+  const allNames=Object.keys(HISTORY);
+  makeSVGChart('allValAccChart',allNames.map((m,i)=>({data:HISTORY[m].val_acc,color:MODEL_COLORS[i%MODEL_COLORS.length],label:m})),{minV:0,maxV:1});
+  document.getElementById('allValAccLeg').innerHTML=allNames.map((m,i)=>`<div class="leg-item"><div class="leg-dot" style="background:${MODEL_COLORS[i%MODEL_COLORS.length]}"></div>${m.replace('_Transfer','').replace('_',' ')}</div>`).join('');
+
+  // Scatters
+  makeScatter('scatterTime',  MODELS.map(m=>({x:m.time,   y:m.acc, label:m.name, color:TYPE_COLOR[m.type], type:m.type})), 'scatterTimeLeg');
+  makeScatter('scatterParams',MODELS.map(m=>({x:m.params, y:m.acc, label:m.name, color:TYPE_COLOR[m.type], type:m.type})), 'scatterParamsLeg');
+
+  // Table
+  const maxAcc=Math.max(...MODELS.map(m=>m.acc));
+  const pillClass={'MLP':'pill-mlp','Custom DNN':'pill-cnn','Traditional ML':'pill-cnn','Transfer Learning':'pill-transfer'};
+  const sortedT=[...MODELS].sort((a,b)=>b.acc-a.acc);
+  document.getElementById('tBody').innerHTML=sortedT.map((m,rank)=>{
+    const bW=(m.acc/maxAcc*100).toFixed(0);
+    const valAcc=HISTORY[m.name]?.val_acc.at(-1)??0;
+    return `<tr>
+      <td style="color:var(--muted)">${rank+1}</td>
+      <td>${m.name.replace('_',' ')}${m.acc===maxAcc?'<span class="best">★</span>':''}</td>
+      <td><span class="type-pill ${pillClass[m.type]}">${m.type}</span></td>
+      <td><div class="acc-cell"><div class="acc-bg"><div class="acc-fill" style="width:${bW}%"></div></div><span style="color:var(--accent);font-size:11px">${(m.acc*100).toFixed(2)}%</span></div></td>
+      <td style="color:var(--subtle)">${(valAcc*100).toFixed(2)}%</td>
+      <td>${m.params.toLocaleString()}</td>
+      <td>${m.time.toFixed(0)}s</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══ INIT ═════════════════════════════════════════════════════════════════════
+boot();
+</script>
+</body>
+</html>
